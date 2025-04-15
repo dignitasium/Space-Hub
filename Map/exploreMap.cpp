@@ -80,7 +80,7 @@ void exploreMap(N5110 &lcd, Joystick &joystick, DigitalIn &selectButton) {
     const int MAX_JUMP_FRAMES = 10;
     const int COYOTE_FRAMES = 6;
     const float GRAVITY = 0.25f;
-    const float JUMP_FORCE = -1.4f;
+    const float JUMP_FORCE = -0.8f;
     const float MAX_FALL_SPEED = 2.0f;
 
     while (true) {
