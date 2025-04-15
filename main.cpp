@@ -3,6 +3,7 @@
 #include "Joystick.h"
 #include "menu.h"
 #include "games.h"
+#include "MapEditor.h"
 
 N5110 lcd(PC_7, PA_9, PB_10, PB_5, PB_3, PA_10);
 Joystick joystick(PC_1, PC_0, PB_4);
@@ -22,7 +23,13 @@ int main() {
         } else if (selected == 1) {
             // Space Invade game
             spaceInvadeGame(lcd, joystick, selectButton);
-        } else {
+        } 
+          else if (selected == 2) {
+            MapEditor editor(lcd, joystick, selectButton);
+            editor.run();
+        }
+        
+        else {
             // Exit option
             lcd.clear();
             lcd.printString("Exiting...", 0, 3);

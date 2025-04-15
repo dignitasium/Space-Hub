@@ -1,7 +1,7 @@
 #include "menu.h"
 
-const int NUM_OPTIONS = 3;
-const char* menuOptionsStr[NUM_OPTIONS] = { "Mars Explorer", "Space Invader", "   Exit   " };
+const int NUM_OPTIONS = 4;
+const char* menuOptionsStr[NUM_OPTIONS] = { "Mars Explorer", "Space Invader", "Map Editor", "   Exit   " };
 int selected = 0;
 
 void showMainMenu(N5110 &lcd, Joystick &joystick, DigitalIn &selectButton) {
