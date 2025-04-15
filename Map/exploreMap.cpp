@@ -28,6 +28,19 @@ void drawBitmap(N5110 &lcd, int x, int y, const unsigned char *bitmap, int width
     }
 }
 
+bool isSolid(int tile) {
+    switch (tile) {
+        case TILE_WALL:
+        case TILE_HAB:
+        case TILE_ROVER:
+        case TILE_TERMINAL:
+        case TILE_CRATER:
+            return true;
+        default:
+            return false;
+    }
+}
+
 void updateViewport() {
     viewportX = playerX - VIEWPORT_WIDTH / 2;
     viewportY = playerY - VIEWPORT_HEIGHT / 2;
@@ -47,18 +60,25 @@ void exploreMap(N5110 &lcd, Joystick &joystick, DigitalIn &selectButton) {
         map[y][MAP_WIDTH - 1] = TILE_WALL;
     }
 
-    for (int x = 5; x < 10; x++) map[6][x] = TILE_HAB;
+    for (int y = 5; y <= 6; y++) {
+        for (int x = 7; x <= 9; x++) {
+            map[y][x] = TILE_HAB;
+        }
+    }
+
+    for (int x = 7; x <= 9; x++) {
+    map[8][x] = TILE_WALL; // assuming MAP_HEIGHT > 8
+    }
+
     for (int x = 15; x < 20; x++) map[6][x] = TILE_ROVER;
 
-    for (int y = 5; y <= 7; y++) {
-        for (int x = 25; x <= 29; x++) map[y][x] = TILE_EMPTY;
-    }
+
     map[5][26] = TILE_CRATER;
     map[5][27] = TILE_CRATER;
     map[5][28] = TILE_CRATER;
     map[6][25] = TILE_CRATER;
     map[6][29] = TILE_CRATER;
-    for (int x = 25; x <= 29; x++) map[7][x] = TILE_CRATER;
+    for (int x = 25; x <= 29; x++) map[6][x] = TILE_CRATER;
 
     for (int x = 35; x < 38; x++) map[6][x] = TILE_TERMINAL;
 
@@ -84,14 +104,16 @@ void exploreMap(N5110 &lcd, Joystick &joystick, DigitalIn &selectButton) {
     const float MAX_FALL_SPEED = 2.0f;
 
     while (true) {
+        
+
         lcd.clear();
 
         Direction d = joystick.get_direction();
         int newX = playerX;
-        if (d == E) newX++;
+        if (d == E) newX++; 
         else if (d == W) newX--;
 
-        on_ground = (playerY + 1 < MAP_HEIGHT && map[playerY + 1][playerX] != TILE_EMPTY);
+        on_ground = (playerY + 1 < MAP_HEIGHT && isSolid(map[playerY + 1][playerX]) );
 
         if (on_ground) {
             coyote_timer = COYOTE_FRAMES;
@@ -133,8 +155,11 @@ void exploreMap(N5110 &lcd, Joystick &joystick, DigitalIn &selectButton) {
             jumping = false;
         }
 
-        if (map[newY][newX] != TILE_WALL) {
+        if (!isSolid(map[playerY][newX])) {
             playerX = newX;
+        }
+
+        if (!isSolid(map[newY][playerX])) {
             playerY = newY;
         } else {
             y_velocity = 0;
@@ -199,7 +224,9 @@ void exploreMap(N5110 &lcd, Joystick &joystick, DigitalIn &selectButton) {
 
         int px = (playerX - viewportX) * TILE_SIZE + 1;
         int py = (playerY - viewportY) * TILE_SIZE + 1 + 8 - playerYOffset;
+        printf("Player at (%d,%d), Tile = %d\n", playerX, playerY, map[playerY][playerX]);
         lcd.drawRect(px, py, TILE_SIZE, TILE_SIZE, FILL_BLACK);
+        
         lcd.refresh();
 
         if (selectButton.read() == 0) {
