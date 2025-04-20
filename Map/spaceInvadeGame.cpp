@@ -33,6 +33,7 @@ static Projectile bullet = {0, 0, false};
 static int combo = 0;
 static bool invincible = false;
 static int invincible_frames = 0;
+static int milestone_level = 0;
 
 static void drawBitmap(N5110 &lcd, int x, int y, const unsigned char *bitmap, int width, int height) {
     int bytesPerRow = (width + 7) / 8;
@@ -68,39 +69,48 @@ static void player_car(N5110 &lcd, int lane) {
     drawBitmap(lcd, x, 32, ship, 15, 15);
 }
 
-// Adjusts the game speed based on the current score by setting delay values.
-// As the score increases, the delay decreases, and the game speeds up.
+// Mini light show triggered at score milestones
+static void light_show(N5110 &lcd) {
+    for (int i = 0; i < 3; i++) {
+        lcd.clear();
+        for (int j = 0; j < 84; j += 8) {
+            lcd.drawLine(j, 0, j, 47, i % 2 == 0 ? 1 : 2);
+        }
+        lcd.refresh();
+        ThisThread::sleep_for(500ms);
+    }
+    lcd.clear();
+    lcd.printString("LEVEL UP!", 10, 2);
+    lcd.refresh();
+    ThisThread::sleep_for(1600ms);
+}
+
 static void Level_Controller() {
-    if (score >= 0 && score <= 10) {
-        game_speed = 0;
-        ThisThread::sleep_for(80ms);
-    } else if (score > 10 && score <= 20) {
-        game_speed = 1;
-        ThisThread::sleep_for(70ms);
-    } else if (score > 20 && score <= 30) {
-        game_speed = 2;
-        ThisThread::sleep_for(60ms);
-    } else if (score > 30 && score <= 40) {
-        game_speed = 3;
-        ThisThread::sleep_for(50ms);
-    } else {
-        ThisThread::sleep_for(40ms);
+    // Set game speed based on milestone level
+    game_speed = milestone_level;
+
+    // Apply delay based on level
+    switch (milestone_level) {
+        case 0: ThisThread::sleep_for(80ms); break;
+        case 1: ThisThread::sleep_for(70ms); break;
+        case 2: ThisThread::sleep_for(60ms); break;
+        case 3: ThisThread::sleep_for(50ms); break;
+        default: ThisThread::sleep_for(40ms); break;
     }
 }
 
-// Displays the game over screen indefinitely after a collision.
+
 static void game_over(N5110 &lcd) {
     while (true) {
         ThisThread::sleep_for(100ms);
         lcd.clear();
         lcd.printString("GAME OVER", 10, 3);
         lcd.refresh();
-        
     }
 }
 
 void spaceInvadeGame(N5110 &lcd, Joystick &joystick, DigitalIn &selectButton) {
-    score = game_speed = enemy_phase = combo = 0;
+    score = game_speed = enemy_phase = combo = milestone_level = 0;
     enemy_dead = true;
     playerLane = 2;
     control = true;
@@ -178,13 +188,23 @@ void spaceInvadeGame(N5110 &lcd, Joystick &joystick, DigitalIn &selectButton) {
             }
         }
 
+        // Enemy hits player if not invincible
         if (!invincible && enemy_phase > 22 && (enemy_0_pos == playerLane || enemy_1_pos == playerLane)) {
             game_over(lcd);
         }
 
+        // Enemy passed without hitting player
         if (enemy_phase > 40) {
             enemy_dead = true;
+            score++;  // Award points for dodging enemies
         }
+
+        // Trigger milestone light show every 10 points
+        if (score >= (milestone_level + 1) * 10) {
+        milestone_level++;
+        game_speed = milestone_level;  // update speed level
+        light_show(lcd);}
+
 
         Level_Controller();
         lcd.refresh();
