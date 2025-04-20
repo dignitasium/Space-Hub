@@ -103,10 +103,14 @@ void MapEditor::drawCursor() {
 }
 
 void MapEditor::drawTileSelector() {
-    char buf[16];
-    sprintf(buf, "Tile: %d", selectedTile);
+    const char* tileNames[] = {
+        "Empty", "Wall", "Habitat", "Rover", "Crater", "Terminal"
+    };
+    char buf[17];
+    sprintf(buf, "Tile: %s", tileNames[selectedTile]);
     lcd.printString(buf, 0, 0);
 }
+
 
 void MapEditor::exportMap() {
     printf("int map[%d][%d] = {\n", MAP_HEIGHT, MAP_WIDTH);
