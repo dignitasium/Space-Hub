@@ -6,35 +6,39 @@
 #include <cstdlib>
 #include <ctime>
 
-// Bitmaps
-const unsigned char ship[] = {
-    0x00,0x00, 0x01,0x00, 0x03,0x80, 0x02,0x80, 0x02,0xC0,
-    0x07,0xC0, 0x0D,0xE0, 0x1F,0xF0, 0x3F,0xF8, 0x7F,0xFC,
-    0x7F,0xFC, 0x7F,0xFC, 0x1F,0xF0, 0x07,0xE0, 0x00,0x00
-};
+// === DEBUG CONFIGURATION ===
+// Modify these to test different levels/scores
+static int score = 0;         // Score starts at this value
+static int level = 1;         // Start directly at a certain level (1–5+)
 
-const unsigned char enemy[] = {
-    0x05,0xE0, 0x0B,0xF0, 0x03,0xF0, 0x33,0xF8, 0x7F,0xFC,
-    0xBF,0xFA, 0x77,0xDC, 0x7E,0xFC, 0x3F,0xFC, 0xEF,0xEE,
-    0xC1,0x86, 0x81,0x82, 0x80,0x82, 0x00,0x00
-};
-
-struct Projectile {
-    int x, y;
-    bool active;
-};
-
-static int score = 0, game_speed = 0, enemy_phase = 0;
+// Game state
+static int game_speed = 0;
+static int enemy_phase = 0;
 static int enemy_0_pos = 2, enemy_1_pos = 2;
 static bool enemy_dead = true;
 static int playerLane = 2;
 static bool control = true;
-static Projectile bullet = {0, 0, false};
 static int combo = 0;
 static bool invincible = false;
 static int invincible_frames = 0;
-static int milestone_level = 0;
 
+struct Projectile { int x, y; bool active; };
+static Projectile bullet = {0, 0, false};
+
+// Bitmaps
+const unsigned char ship[] = {
+    0x00,0x00,0x01,0x00,0x03,0x80,0x02,0x80,0x02,0xC0,
+    0x07,0xC0,0x0D,0xE0,0x1F,0xF0,0x3F,0xF8,0x7F,0xFC,
+    0x7F,0xFC,0x7F,0xFC,0x1F,0xF0,0x07,0xE0,0x00,0x00
+};
+
+const unsigned char enemy[] = {
+    0x05,0xE0,0x0B,0xF0,0x03,0xF0,0x33,0xF8,0x7F,0xFC,
+    0xBF,0xFA,0x77,0xDC,0x7E,0xFC,0x3F,0xFC,0xEF,0xEE,
+    0xC1,0x86,0x81,0x82,0x80,0x82,0x00,0x00
+};
+
+// --- Drawing ---
 static void drawBitmap(N5110 &lcd, int x, int y, const unsigned char *bitmap, int width, int height) {
     int bytesPerRow = (width + 7) / 8;
     for (int row = 0; row < height; row++) {
@@ -53,10 +57,12 @@ static void gamescreen(N5110 &lcd) {
     lcd.drawLine(50, 0, 50, 47, FILL_BLACK);
     lcd.drawLine(0, 47, 50, 47, FILL_BLACK);
     char buffer[16];
-    sprintf(buffer, "Speed:%d", game_speed);
-    lcd.printString(buffer, 42, 0);
-    sprintf(buffer, "Score:%d", score);
-    lcd.printString(buffer, 42, 2);
+    sprintf(buffer, "Lv:%d", level);
+    lcd.printString(buffer, 52, 0);
+    sprintf(buffer, "Sp:%d", game_speed);
+    lcd.printString(buffer, 52, 1);
+    sprintf(buffer, "Sc:%d", score);
+    lcd.printString(buffer, 52, 2);
 }
 
 static void enemy_ship(N5110 &lcd, int lane, int phase) {
@@ -69,49 +75,82 @@ static void player_car(N5110 &lcd, int lane) {
     drawBitmap(lcd, x, 32, ship, 15, 15);
 }
 
-// Mini light show triggered at score milestones
-static void light_show(N5110 &lcd) {
-    for (int i = 0; i < 3; i++) {
+// --- Level Transition ---
+static void light_show(N5110 &lcd, int current_level) {
+    for (int i = 0; i < 6; i++) {
         lcd.clear();
-        for (int j = 0; j < 84; j += 8) {
-            lcd.drawLine(j, 0, j, 47, i % 2 == 0 ? 1 : 2);
-        }
+        if (i % 2 == 0) lcd.drawRect(0, 0, 84, 48, FILL_BLACK);
         lcd.refresh();
-        ThisThread::sleep_for(500ms);
+        ThisThread::sleep_for(100ms);
     }
     lcd.clear();
-    lcd.printString("LEVEL UP!", 10, 2);
+    char buffer[16];
+    sprintf(buffer, "LEVEL %d", current_level);
+    lcd.printString(buffer, 18, 2);
     lcd.refresh();
-    ThisThread::sleep_for(1600ms);
+    ThisThread::sleep_for(1200ms);
 }
 
-static void Level_Controller() {
-    // Set game speed based on milestone level
-    game_speed = milestone_level;
+// --- Main level controller ---
+static void Level_Controller(N5110 &lcd) {
+    static bool leveled_up = false;
+    static int previous_level = 0;
 
-    // Apply delay based on level
-    switch (milestone_level) {
-        case 0: ThisThread::sleep_for(80ms); break;
-        case 1: ThisThread::sleep_for(70ms); break;
-        case 2: ThisThread::sleep_for(60ms); break;
-        case 3: ThisThread::sleep_for(50ms); break;
-        default: ThisThread::sleep_for(40ms); break;
+    if (score >= 10 && !leveled_up) {
+        level++;
+        score = 0;
+        printf(">>> LEVEL UP >>> Now at level %d\n", level);
+        light_show(lcd, level);
+        leveled_up = true;
+    } else if (score < 10) {
+        leveled_up = false;
+    }
+
+    // === DISTINGUISH LEVELS ===
+    if (level == 1) {
+        game_speed = 0;
+        printf("========== LEVEL 1 ==========\n");
+    }
+    else if (level == 2) {
+        game_speed = 1;
+        printf("========== LEVEL 2 ==========\n");
+    }
+    else if (level == 3) {
+        game_speed = 2;
+        printf("========== LEVEL 3 ==========\n");
+    }
+    else if (level == 4) {
+        game_speed = 3;
+        printf("========== LEVEL 4 ==========\n");
+    }
+    else if (level == 5) {
+        game_speed = 4;
+        printf("========== LEVEL 5 ==========\n");
+    }
+    else if (level >= 6) {
+        game_speed = 5;
+        printf("========== LEVEL 6+ ==========\n");
+    }
+
+    if (level != previous_level) {
+        previous_level = level;
     }
 }
 
-
+// --- Game Over ---
 static void game_over(N5110 &lcd) {
     while (true) {
-        ThisThread::sleep_for(100ms);
         lcd.clear();
         lcd.printString("GAME OVER", 10, 3);
         lcd.refresh();
+        ThisThread::sleep_for(400ms);
     }
 }
 
+// --- Game Logic ---
 void spaceInvadeGame(N5110 &lcd, Joystick &joystick, DigitalIn &selectButton) {
-    score = game_speed = enemy_phase = combo = milestone_level = 0;
     enemy_dead = true;
+    enemy_phase = 0;
     playerLane = 2;
     control = true;
     invincible = false;
@@ -123,12 +162,12 @@ void spaceInvadeGame(N5110 &lcd, Joystick &joystick, DigitalIn &selectButton) {
     lcd.printString("Space Invaders", 0, 1);
     lcd.printString("Press select", 0, 2);
     lcd.refresh();
+
     while (selectButton.read() == 1) ThisThread::sleep_for(100ms);
     while (selectButton.read() == 0) ThisThread::sleep_for(50ms);
 
     while (true) {
         lcd.clear();
-        gamescreen(lcd);
 
         Direction d = joystick.get_direction();
         if (d == W && playerLane > 1 && control) {
@@ -188,26 +227,27 @@ void spaceInvadeGame(N5110 &lcd, Joystick &joystick, DigitalIn &selectButton) {
             }
         }
 
-        // Enemy hits player if not invincible
         if (!invincible && enemy_phase > 22 && (enemy_0_pos == playerLane || enemy_1_pos == playerLane)) {
             game_over(lcd);
         }
 
-        // Enemy passed without hitting player
         if (enemy_phase > 40) {
             enemy_dead = true;
-            score++;  // Award points for dodging enemies
+            score++;
         }
 
-        // Trigger milestone light show every 10 points
-        if (score >= (milestone_level + 1) * 10) {
-        milestone_level++;
-        game_speed = milestone_level;  // update speed level
-        light_show(lcd);}
-
-
-        Level_Controller();
+        Level_Controller(lcd);
+        gamescreen(lcd);
         lcd.refresh();
+
+        switch (game_speed) {
+            case 0: ThisThread::sleep_for(80ms); break;
+            case 1: ThisThread::sleep_for(70ms); break;
+            case 2: ThisThread::sleep_for(60ms); break;
+            case 3: ThisThread::sleep_for(50ms); break;
+            case 4: ThisThread::sleep_for(40ms); break;
+            default: ThisThread::sleep_for(30ms); break;
+        }
 
         if (selectButton.read() == 0) {
             while (selectButton.read() == 0) ThisThread::sleep_for(50ms);
